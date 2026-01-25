@@ -1,0 +1,230 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace Modufolio\Psr7\Tests\Unit\Http;
+
+use Modufolio\Psr7\Http\Stream;
+use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\StreamInterface;
+
+class StreamTest extends TestCase
+{
+    public function testConstructorInitializesProperties(): void
+    {
+        $handle = \fopen('php://temp', 'r+');
+        \fwrite($handle, 'data');
+        $stream = Stream::create($handle);
+        $this->assertTrue($stream->isReadable());
+        $this->assertTrue($stream->isWritable());
+        $this->assertTrue($stream->isSeekable());
+        $this->assertEquals('php://temp', $stream->getMetadata('uri'));
+        $this->assertIsArray($stream->getMetadata());
+        $this->assertEquals(4, $stream->getSize());
+        $this->assertFalse($stream->eof());
+        $stream->close();
+    }
+
+    public function testConstructorSeekWithStringContent(): void
+    {
+        $content = \str_repeat('Hello', 50000);
+        $stream = Stream::create($content);
+        $this->assertTrue($stream->isReadable());
+        $this->assertTrue($stream->isWritable());
+        $this->assertTrue($stream->isSeekable());
+        $this->assertTrue(\is_array($stream->getMetadata()));
+        $this->assertSame(250000, $stream->getSize());
+        $this->assertFalse($stream->eof());
+        $stream->close();
+
+        $stream = Stream::create('Hello');
+        $this->assertSame('Hello', $stream->__toString());
+    }
+
+    public function testStreamClosesHandleOnDestruct(): void
+    {
+        $handle = \fopen('php://temp', 'r');
+        $stream = Stream::create($handle);
+        unset($stream);
+        $this->assertFalse(\is_resource($handle));
+    }
+
+    public function testConvertsToString(): void
+    {
+        $handle = \fopen('php://temp', 'w+');
+        \fwrite($handle, 'data');
+        $stream = Stream::create($handle);
+        $this->assertEquals('data', (string)$stream);
+        $this->assertEquals('data', (string)$stream);
+        $stream->close();
+    }
+
+    public function testBuildFromString(): void
+    {
+        $stream = Stream::create('data');
+        $this->assertEquals('data', $stream->__toString());
+        $stream->close();
+    }
+
+    public function testGetsContents(): void
+    {
+        $handle = \fopen('php://temp', 'w+');
+        \fwrite($handle, 'data');
+        $stream = Stream::create($handle);
+        $this->assertEquals('', $stream->getContents());
+        $stream->seek(0);
+        $this->assertEquals('data', $stream->getContents());
+        $this->assertEquals('', $stream->getContents());
+    }
+
+    public function testChecksEof(): void
+    {
+        $handle = \fopen('php://temp', 'w+');
+        \fwrite($handle, 'data');
+        $stream = Stream::create($handle);
+        $this->assertFalse($stream->eof());
+        $stream->read(4);
+        $this->assertTrue($stream->eof());
+        $stream->close();
+    }
+
+    public function testGetSize(): void
+    {
+        $size = \filesize(__FILE__);
+        $handle = \fopen(__FILE__, 'r');
+        $stream = Stream::create($handle);
+        $this->assertEquals($size, $stream->getSize());
+        // Load from cache
+        $this->assertEquals($size, $stream->getSize());
+        $stream->close();
+    }
+
+    public function testEnsuresSizeIsConsistent(): void
+    {
+        $h = \fopen('php://temp', 'w+');
+        $this->assertEquals(3, \fwrite($h, 'foo'));
+        $stream = Stream::create($h);
+        $this->assertEquals(3, $stream->getSize());
+        $this->assertEquals(4, $stream->write('test'));
+        $this->assertEquals(7, $stream->getSize());
+        $this->assertEquals(7, $stream->getSize());
+        $stream->close();
+    }
+
+    public function testProvidesStreamPosition(): void
+    {
+        $handle = \fopen('php://temp', 'w+');
+        $stream = Stream::create($handle);
+        $this->assertEquals(0, $stream->tell());
+        $stream->write('foo');
+        $this->assertEquals(3, $stream->tell());
+        $stream->seek(1);
+        $this->assertEquals(1, $stream->tell());
+        $this->assertSame(\ftell($handle), $stream->tell());
+        $stream->close();
+    }
+
+    public function testCanDetachStream(): void
+    {
+        $r = \fopen('php://temp', 'w+');
+        $stream = Stream::create($r);
+        $stream->write('foo');
+        $this->assertTrue($stream->isReadable());
+        $this->assertSame($r, $stream->detach());
+        $stream->detach();
+
+        $this->assertFalse($stream->isReadable());
+        $this->assertFalse($stream->isWritable());
+        $this->assertFalse($stream->isSeekable());
+
+        $throws = function (callable $fn) use ($stream) {
+            try {
+                $fn($stream);
+                $this->fail();
+            } catch (\Exception $e) {
+                // Suppress the exception
+            }
+        };
+
+        $throws(function ($stream) {
+            $stream->read(10);
+        });
+        $throws(function ($stream) {
+            $stream->write('bar');
+        });
+        $throws(function ($stream) {
+            $stream->seek(10);
+        });
+        $throws(function ($stream) {
+            $stream->tell();
+        });
+        $throws(function ($stream) {
+            $stream->eof();
+        });
+        $throws(function ($stream) {
+            $stream->getSize();
+        });
+        $throws(function ($stream) {
+            $stream->getContents();
+        });
+        if (\PHP_VERSION_ID >= 70400) {
+            $throws(function ($stream) {
+                (string)$stream;
+            });
+        } elseif (!(new \ReflectionMethod(StreamInterface::class, '__toString'))->hasReturnType()) {
+            $this->assertSame('', (string)$stream);
+
+            SymfonyErrorHandler::register();
+            $throws(function ($stream) {
+                (string)$stream;
+            });
+            \restore_error_handler();
+            \restore_exception_handler();
+        }
+
+        $stream->close();
+    }
+
+    public function testCloseClearProperties(): void
+    {
+        $handle = \fopen('php://temp', 'r+');
+        $stream = Stream::create($handle);
+        $stream->close();
+
+        $this->assertFalse($stream->isSeekable());
+        $this->assertFalse($stream->isReadable());
+        $this->assertFalse($stream->isWritable());
+        $this->assertNull($stream->getSize());
+        $this->assertEmpty($stream->getMetadata());
+    }
+
+    public function testUnseekableStreamWrapper(): void
+    {
+        \stream_wrapper_register('nyholm-psr7-test', TestStreamWrapper::class);
+        $handle = \fopen('nyholm-psr7-test://', 'r');
+        \stream_wrapper_unregister('nyholm-psr7-test');
+
+        $stream = Stream::create($handle);
+        $this->assertFalse($stream->isSeekable());
+    }
+}
+
+class TestStreamWrapper
+{
+    public $context;
+
+    public function stream_open(): bool
+    {
+        return true;
+    }
+
+    public function stream_seek(int $offset, int $whence = \SEEK_SET): bool
+    {
+        return false;
+    }
+
+    public function stream_eof(): bool
+    {
+        return true;
+    }
+}
