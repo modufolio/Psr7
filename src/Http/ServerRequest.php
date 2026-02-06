@@ -4,7 +4,8 @@ declare(strict_types = 1);
 
 namespace Modufolio\Psr7\Http;
 
-use Modufolio\Exception\PayloadTooLargeException;
+
+use Modufolio\Psr7\Http\Exception\PayloadTooLargeException;
 use Psr\Http\Message\{ServerRequestInterface, StreamInterface, UploadedFileInterface, UriInterface};
 
 /**
