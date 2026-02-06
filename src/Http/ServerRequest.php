@@ -66,8 +66,8 @@ class ServerRequest implements ServerRequestInterface
 
         $this->registerMediaTypeParser('application/json', function ($input) {
 
-            if (strlen($input) > 500) {
-                throw new PayloadTooLargeException('JSON payload exceeds 500 characters.');
+            if (strlen($input) > 1024 * 1024) { // 1MB limit for JSON payloads
+                throw new PayloadTooLargeException('JSON payload exceeds the maximum allowed size of 1MB');
             }
 
             if(trim($input) === '') {
