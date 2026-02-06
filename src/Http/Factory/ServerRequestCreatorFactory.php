@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Modufolio\Appkit\Factory;
+namespace Modufolio\Psr7\Http\Factory;
 
 use Modufolio\Psr7\Http\ServerRequestCreator;
 use Modufolio\Psr7\Http\ServerRequestCreatorInterface;
