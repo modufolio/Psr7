@@ -437,8 +437,8 @@ class ResponseTest extends TestCase
     public function testRedirectResponseThrowsOnInvalidStatus(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('The redirect status code must be 301 or 302');
+        $this->expectExceptionMessage('The redirect status code must be one of: 301, 302, 303, 307, 308');
 
-        Response::redirect('/test', 303);
+        Response::redirect('/test', 305);
     }
 }
