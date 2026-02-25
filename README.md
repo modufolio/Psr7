@@ -54,27 +54,7 @@ $stream = Stream::create('Hello World');
 echo $stream->getContents(); // "Hello World"
 ```
 
-### Handling Uploaded Files
 
-```php
-use Modufolio\Psr7\Http\UploadedFile;
-
-$uploadedFile = new UploadedFile(
-    '/tmp/phpYzdqkD',
-    'document.pdf',
-    'application/pdf',
-    null,
-    UPLOAD_ERR_OK
-);
-
-$uploadedFile->moveTo('/uploads/document.pdf');
-```
-
-## Testing
-
-```bash
-composer test
-```
 
 ## License
 
