@@ -108,7 +108,11 @@ class Response implements ResponseInterface
         }
 
         if (is_string($body)) {
-            if (!json_validate($body)) {
+            $isValid = function_exists('json_validate')
+                ? json_validate($body)
+                : (json_decode($body) !== null || json_last_error() === JSON_ERROR_NONE);
+
+            if (!$isValid) {
                 throw new JsonException('Invalid JSON payload');
             }
             $bodyContent = $body;
